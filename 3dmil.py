@@ -19,17 +19,21 @@ logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 # SUBMODULE TO CALCULATE DESCRIPTORS
 # ----------------------------------
 def calc_descriptors(config):
-    descriptor_method = config["descriptor_method"]
-    filename = os.path.join(config["path_to_dataset"], config["dataset"] + ".smi")
-    if descriptor_method == "pmapper":
-        calc_pmapper(filename)
-    elif descriptor_method == "rdkit_2d":
-        calc_rdkit_2d(filename)
+    """ Calculate descriptors.
+
+    """
+    method = config["descriptor"]["method"]
+    filename = os.path.join(config["option"]["path_to_dataset"], config["option"]["dataset"] + ".smi")
+
+    if method == "pmapper":
+        calc_pmapper(filename, config)
+    elif method == "rdkit_2d":
+        calc_rdkit_2d(filename, config)
     elif descriptro_method == "rdkit_morgan":
-        calc_rdkit_morgan(filename)
+        calc_rdkit_morgan(filename, config)
 
 
-def calc_pmapper(filename, nconfs=5, energy_threshold=10, ncpu=1):
+def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=0.5, ncpu=1):
     """
     Calculate descriptors. 
     
@@ -62,6 +66,14 @@ def calc_pmapper(filename, nconfs=5, energy_threshold=10, ncpu=1):
     """
     logging.debug(f" Calculate 3D-pmapper descriptors")
 
+    for key in config["descriptor"]:
+        if key == "energy_threshold":
+            energy_threshold = config["descriptor"][key]
+        if key == "n_conformation":
+            nconfs = config["descriptor"][key]
+        if key == rms_threshold:
+            rms_threshold = config["descriptor"][key]
+
     # Settings
     nconfs_list = [1, nconfs]
     ncpu = ncpu
@@ -74,6 +86,29 @@ def calc_pmapper(filename, nconfs=5, energy_threshold=10, ncpu=1):
     out_fname = calc_3d_pmapper(input_fname=dataset_file, nconfs_list=nconfs_list, energy=energy_threshold,  descr_num=[4],
                                 path=descriptor_folder, ncpu=ncpu)
 
+
+def calc_rdkit_2d(filename):
+    """ Calculate 2D descriptors using RDKit.
+    """
+    dataset_file = filename
+    descriptor_folder = os.path.join('descriptor')
+    if not os.path.exists('descriptor'):
+        os.mkdir('descriptor')
+
+    from miqsar.descriptor_calculation.rdkit_2d import calc_2d_descriptors
+    out_path = calc_2d_descriptors(fname=dataset_file, path=descriptor_folder)
+
+
+def calc_rdkit_morgan(filename):
+    """ Calculate morgan fingerprint using RDKit.
+    """
+    dataset_file = filename
+    descriptor_folder = os.path.join('descriptor')
+    if not os.path.exists('descriptor'):
+        os.mkdir('descriptor')
+
+    from miqsar.descriptor_calculation.rdkit_morgan import calc_morgan_descriptors
+    out_path = calc_morgan_descriptors(fname=dataset_file, path=descriptor_folder)
 
 
 # ----------------------------
@@ -90,7 +125,26 @@ def _str_to_vec(dsc_str, dsc_num):
     return vec
 
 
-def prepare_dataset(descriptor_file):
+def _load_descriptor_file():
+    #descriptor_filename = os.path.join('descriptors', 'PhFprPmapper_conf-CHEMBL1075104_5.txt')
+    descriptor_file = glob.glob('descriptor/*.txt')
+    descriptor_file.sort()
+    descriptor_file = descriptor_file[-1]
+
+    # Check extension
+    assert os.path.splitext(descriptor_file)[-1] == '.txt'
+    logging.debug(f' Descriptor file is "{descriptor_file}"')
+    
+    # Load files
+    with open(descriptor_file) as f:
+        dsc_tmp = [i.strip() for i in f.readlines()]
+    with open(descriptor_file.replace('txt', 'rownames')) as f:
+        mol_names = [i.strip() for i in f.readlines()]
+
+    return dsc_tmp, mol_names
+
+
+def prepare_dataset(config):
     """
     Prepare traing and test set.
 
@@ -110,15 +164,9 @@ def prepare_dataset(descriptor_file):
     """
     logging.debug(f" Prepare datasets")
 
-    # Check extension
-    assert os.path.splitext(descriptor_file)[-1] == '.txt'
+    #
+    dsc_tmp, mol_names = _load_descriptor_file()
 
-    # Load files
-    with open(descriptor_file) as f:
-        dsc_tmp = [i.strip() for i in f.readlines()]
-    with open(descriptor_file.replace('txt', 'rownames')) as f:
-        mol_names = [i.strip() for i in f.readlines()]
-    
     # 
     labels_tmp = [float(i.split(':')[1]) for i in mol_names]
     idx_tmp = [i.split(':')[0] for i in mol_names]
@@ -143,33 +191,36 @@ def prepare_dataset(descriptor_file):
     # Split dataset
     from sklearn.model_selection import train_test_split
     # Note: train_test_split will return [n_confs, n_desriptors]. n_confs can differ among molecules meaning that the array is hetero array.
-    x_train, x_test, y_train, y_test, idx_train, idx_test = train_test_split(bags, labels, idx)
-    logging.debug(f' There are {len(x_train)} training molecules and {len(x_test)} test molecules')
+    random_seed = config["option"]["random_seed"]
+    train_val_test_ratio = config["option"]["train_val_test_ratio"]
+    test_size = train_val_test_ratio[-1]
+    train_val_size = 1 - test_size
+    x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test = train_test_split(bags, labels, idx, test_size=test_size, train_size=train_val_size, random_state=random_seed)
+    logging.debug(f' There are {len(x_train_val)} training/validate molecules and {len(x_test)} test molecules')
 
     min_max_conf = [ _x.shape[0] for _x in bags ]
     min_max_conf = np.array(min_max_conf)
-    logging.debug(f' Number of conformations range between {min_max_conf.min()} - {min_max_conf.max()}')
+    logging.debug(f' Number of conformations range between {min_max_conf.min()}-{min_max_conf.max()}')
 
     # Save numpy
     np.savez_compressed(
         file='input.npz', 
-        x_train=x_train,
+        x_train_val=x_train_val,
         x_test=x_test,
-        y_train=y_train,
+        y_train_val=y_train_val,
         y_test=y_test,
-        idx_train=idx_train,
+        idx_train_val=idx_train_val,
         idx_test=idx_test
         )
 
-    return x_train, x_test, y_train, y_test, idx_train, idx_test
+    return x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test
 
 
 # ----------------------------
 # SUBMODULE FOR TRAINING MODEL
 # ----------------------------
-def _scale_data(x_train, x_test):
-    """
-    Scale dataset.
+def _scale_data(x_train_val, x_test):
+    """ Scale dataset.
 
     Parameters
     ----------
@@ -184,23 +235,48 @@ def _scale_data(x_train, x_test):
     from sklearn.preprocessing import MinMaxScaler
     
     scaler = MinMaxScaler()
-    scaler.fit(np.vstack(x_train))
-    x_train_scaled = x_train.copy()
+    scaler.fit(np.vstack(x_train_val))
+    x_train_val_scaled = x_train_val.copy()
     x_test_scaled = x_test.copy()
     
-    for i, bag in enumerate(x_train):
-        x_train_scaled[i] = scaler.transform(bag)
+    for i, bag in enumerate(x_train_val):
+        x_train_val_scaled[i] = scaler.transform(bag)
     for i, bag in enumerate(x_test):
         x_test_scaled[i] = scaler.transform(bag)
     
-    x_train_scaled, x_test_scaled = np.array(x_train_scaled), np.array(x_test_scaled)
+    x_train_val_scaled, x_test_scaled = np.array(x_train_val_scaled), np.array(x_test_scaled)
     
-    return x_train_scaled, x_test_scaled
+    return x_train_val_scaled, x_test_scaled
 
 
-def train_model(wrapper_method, x_train, x_test, y_train, y_test, idx_train, idx_test):
-    """
-    Train model.
+def _get_params(config):
+    config_ml = config["ml_model"]
+    hidden_layer_units = config_ml["hidden_layer_units"]
+    pool = config_ml["pool"]
+    n_epoch = config_ml["n_epoch"]
+    lr = config_ml["lr"]
+    weight_decay = config_ml["weight_decay"]
+    batch_size = config_ml["batch_size"]
+    dropout = config_ml["dropout"]
+
+    return hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout
+
+
+def _get_params_attention(config):
+    config_ml = config["ml_model"]
+    hidden_layer_units = config_ml["hidden_layer_units"]
+    det_ndim = tuple(config_ml["attention_hidden_layer_units"])
+    n_epoch = config_ml["n_epoch"]
+    lr = config_ml["lr"]
+    weight_decay = config_ml["weight_decay"]
+    batch_size = config_ml["batch_size"]
+    dropout = config_ml["dropout"]
+
+    return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, dropout
+
+
+def train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test):
+    """ Train model.
 
     Parameters
     ----------
@@ -234,46 +310,79 @@ def train_model(wrapper_method, x_train, x_test, y_train, y_test, idx_train, idx
     """
     logging.debug(f" Train model")
 
-    from miqsar.estimators.wrappers import InstanceWrapperMLPRegressor, BagWrapperMLPRegressor
-    from miqsar.estimators.utils import set_seed
-
     # Scaled dataset
-    x_train_scaled, x_test_scaled = _scale_data(x_train, x_test)
-
-    # Define model
-    set_seed(43)
-    ndim = (x_train_scaled[0].shape[1], 256, 128, 64)
-    pool = 'mean'
-    n_epoch = 1000
-    lr = 0.001
-    weight_decay = 0.001
-    batch_size = 99999999
-    dropout = 0
-    init_cuda = True
+    x_train_val_scaled, x_test_scaled = _scale_data(x_train_val, x_test)
 
     # Train
-    if wrapper_method == "instance":
-        net = InstanceWrapperMLPRegressor(ndim=ndim, pool=pool, init_cuda=init_cuda)
-    else:
-        net = BagWrapperMLPRegressor(ndim=ndim, pool=pool, init_cuda=init_cuda)
-    net.fit(x_train_scaled, y_train, 
+    method = config["ml_model"]["method"]
+    random_seed = config["option"]["random_seed"]
+
+    if method in ["InstanceWrapperMLPRegressor", "BagWrapperMLPRegressor", "InstanceWrapperMLPClassifier", "BagWrapperMLPClassifier"]:
+        from miqsar.estimators.utils import set_seed
+        set_seed(random_seed)
+        hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout = _get_params(config)
+        input_unit = x_train_val_scaled[0].shape[1]
+        hidden_layer_units.insert(0, input_unit)
+        ndim = tuple(hidden_layer_units)
+
+        from miqsar.estimators.wrappers import InstanceWrapperMLPRegressor, BagWrapperMLPRegressor
+        if method == "InstanceWrapperMLPRegressor":
+            net = InstanceWrapperMLPRegressor(ndim=ndim, pool=pool, init_cuda=True)
+        elif method == "BagWrapperMLPRegressor":
+            net = BagWrapperMLPRegressor(ndim=ndim, pool=pool, init_cuda=True)
+        elif method == "InstanceWrapperMLPClassifier":
+            #net = InstanceWrapperMLPClassifier(ndim=ndim, pool=pool, init_cuda=True)
+            raise NotImplementedError("InstanceWrapperMLPClassifier not supported")
+        elif method == "BagWrapperMLPClassifier":
+            #net = BagWrapperMLPClassifier(ndim=ndim, pool=pool, init_cuda=True)
+            raise NotImplementedError("BagWrapperMLPClassifierr not supported")
+
+        net.fit(x_train_val_scaled, y_train_val, 
             n_epoch=n_epoch, 
             lr=lr,
             weight_decay=weight_decay,
             batch_size=batch_size,
             dropout=dropout)
 
+    elif method in ["AttentionNetRegressor", "AttentionNetClassifier"]:
+        from miqsar.estimators.utils import set_seed
+        set_seed(random_seed)
+        hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, dropout =  _get_params_attention(config)
+        input_unit = x_train_val_scaled[0].shape[1]
+        hidden_layer_units.insert(0, input_unit)
+        ndim = tuple(hidden_layer_units)
+
+        from miqsar.estimators.attention_nets import AttentionNetRegressor, AttentionNetClassifier
+        if method == "AttentionNetRegressor":
+            net = AttentionNetRegressor(ndim=ndim, det_ndim=det_ndim, init_cuda=True)
+        elif method == "AttentionNetClassifier":
+            #net = AttentionNetClassifier(ndim=ndim, det_ndim=det_ndim, init_cuda=True)
+            raise NotImplementedError("AttentionNetClassifier not supported")
+
+        net.fit(x_train_val_scaled, y_train_val, 
+            n_epoch=n_epoch, 
+            lr=lr,
+            weight_decay=weight_decay,
+            batch_size=batch_size,
+            instance_dropout=dropout)
+
+    elif method == "RandomForestRegressor":
+        pass
+    elif metho == "RandomForestClassifier":
+        raise NotImplementedError("RandomForestClassifier not supported")
+
     # Metrics
     from sklearn.metrics import r2_score, mean_absolute_error
     y_pred = net.predict(x_test_scaled)
-
+    y_pred = np.array(y_pred).flatten()
+    
     # Save
     with open("results.txt", "w") as wf:
-        wf.write("{:8s}\t{:15s}\t{:15s}\n".format("INDEX", "EXPERIMENT", "PREDICTION"))
+        wf.write("{:8s}\t{:8s}\t{:15s}\t{:15s}\n".format("INDEX", "NAME", "EXPERIMENT", "PREDICTION"))
         for i, idx in enumerate(idx_test):
-            wf.write("{:8d}\t{:15.2f}\t{15.2f}\n".format(idx[i], y_test[i], y_pred[i]))
+            wf.write("{:8d}\t{:8s}\t{:15.2f}\t{:15.2f}\n".format(i, idx, y_test[i], y_pred[i]))
     with open("metric.txt", "w") as wf:
-        wf.write('3D/MI/Instance-Wrapper: r2_score test = {:.2f}'.format(r2_score(y_test, y_pred)))
+        wf.write('{}/{}: r2_score test = {:.2f}'.format(config["descriptor"]["method"], method, r2_score(y_test, y_pred)))
 
 
 
@@ -283,36 +392,24 @@ def train_model(wrapper_method, x_train, x_test, y_train, y_test, idx_train, idx
 def run(config):
     """
     """
+    import yaml
+    with open('config.yml', 'r') as f:
+        config = yaml.safe_load(f)
     logging.debug(f' Configuration {config}')
 
     # Calculate descriptors
-    #calc_descriptors(config)
+    calc_descriptors(config)
 
     # Split data into a training and test set
-    #descriptor_filename = os.path.join('descriptors', 'PhFprPmapper_conf-CHEMBL1075104_5.txt')
-    descriptor_file = glob.glob('descriptor/*.txt')
-    descriptor_file.sort()
-    descriptor_file = descriptor_file[-1]
-    logging.debug(f' Descriptor file is "{descriptor_file}"')
-    x_train, x_test, y_train, y_test, idx_train, idx_test = prepare_dataset(descriptor_file)
+    x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test = prepare_dataset(config)
     
     # Train model
-    wrapper_method = config['wrapper_method']
-    train_model(wrapper_method, x_train, x_test, y_train, y_test, idx_train, idx_test)
-
-    # Run baseline qsar?
-    #if baseline == True:
-    #    run_baseline()
-
+    train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test)
 
 @click.command()
-@click.option("--path_to_dataset", required=True, help="path to dataset file")
-@click.option("--dataset", required=True, help="dataset name")
-@click.option("--descriptor_method", required=True, help="type of descriptors")
-@click.option("--wrapper_method", required=True, help="wrapper method")
+@click.option("--yaml", required=True, help="yaml file with configuration")
 def cli(**kwargs):
     run(kwargs)
-
 
 
 if __name__ == '__main__':
