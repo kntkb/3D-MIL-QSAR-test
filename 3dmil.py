@@ -28,9 +28,9 @@ def calc_descriptors(config):
     if method == "pmapper":
         calc_pmapper(filename, config)
     elif method == "rdkit_2d":
-        calc_rdkit_2d(filename, config)
-    elif descriptro_method == "rdkit_morgan":
-        calc_rdkit_morgan(filename, config)
+        calc_rdkit_2d(filename)
+    elif method == "rdkit_morgan":
+        calc_rdkit_morgan(filename)
 
 
 def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=0.5, ncpu=1):
@@ -144,6 +144,24 @@ def _load_descriptor_file():
     return dsc_tmp, mol_names
 
 
+def _load_descriptor_file_rdkit():
+    descriptor_file = glob.glob('descriptor/*.csv')[0]
+    df = pd.read_csv(descriptor_file, sep=",")
+    colnames = df.columns.to_list()
+
+    molid_header = colnames[-2]
+    label_header = colnames[-3]
+    dsc_header = colnames[0:-3]
+    mol_names = df[molid_header].to_list()
+    labels = df[label_header].to_numpy()
+    dsc = df[dsc_header].to_numpy()
+
+    assert len(mol_names) == labels.shape[0] == dsc.shape[0]
+    logging.debug(f' Found {len(dsc_header)} descriptors')
+
+    return dsc, labels, mol_names
+
+
 def prepare_dataset(config):
     """
     Prepare traing and test set.
@@ -164,29 +182,32 @@ def prepare_dataset(config):
     """
     logging.debug(f" Prepare datasets")
 
-    #
-    dsc_tmp, mol_names = _load_descriptor_file()
+    if config["descriptor"]["method"] == "pmapper":
+        #
+        dsc_tmp, mol_names = _load_descriptor_file()
 
-    # 
-    labels_tmp = [float(i.split(':')[1]) for i in mol_names]
-    idx_tmp = [i.split(':')[0] for i in mol_names]
-    dsc_num = max([max([int(j.split(':')[0]) for j in i.strip().split(' ')]) for i in dsc_tmp])
-    
-    # 
-    bags, labels, idx = [], [], []
-    for mol_idx in list(np.unique(idx_tmp)):
-        bag, labels_, idx_ = [], [], []
-        for dsc_str, label, i in zip(dsc_tmp, labels_tmp, idx_tmp):
-            if i == mol_idx:
-                bag.append(_str_to_vec(dsc_str, dsc_num))
-                labels_.append(label)
-                idx_.append(i)
-        bags.append(np.array(bag).astype('uint8'))
-        labels.append(labels_[0])
-        idx.append(idx_[0])
-    
-    bags, labels, idx = np.array(bags, dtype='object'), np.array(labels), np.array(idx)
-    logging.debug(f' There are {len(bags)} molecules encoded with {bags[0].shape[1]} descriptors')
+        # 
+        labels_tmp = [float(i.split(':')[1]) for i in mol_names]
+        idx_tmp = [i.split(':')[0] for i in mol_names]
+        dsc_num = max([max([int(j.split(':')[0]) for j in i.strip().split(' ')]) for i in dsc_tmp])
+        
+        # 
+        bags, labels, idx = [], [], []
+        for mol_idx in list(np.unique(idx_tmp)):
+            bag, labels_, idx_ = [], [], []
+            for dsc_str, label, i in zip(dsc_tmp, labels_tmp, idx_tmp):
+                if i == mol_idx:
+                    bag.append(_str_to_vec(dsc_str, dsc_num))
+                    labels_.append(label)
+                    idx_.append(i)
+            bags.append(np.array(bag).astype('uint8'))
+            labels.append(labels_[0])
+            idx.append(idx_[0])
+        
+        bags, labels, idx = np.array(bags, dtype='object'), np.array(labels), np.array(idx)
+        logging.debug(f' There are {len(bags)} molecules encoded with {bags[0].shape[1]} descriptors')
+    elif config["descriptor"]["method"].startswith("rdkit"):
+        bags, labels, idx = _load_descriptor_file_rdkit()
 
     # Split dataset
     from sklearn.model_selection import train_test_split
@@ -198,9 +219,9 @@ def prepare_dataset(config):
     x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test = train_test_split(bags, labels, idx, test_size=test_size, train_size=train_val_size, random_state=random_seed)
     logging.debug(f' There are {len(x_train_val)} training/validate molecules and {len(x_test)} test molecules')
 
-    min_max_conf = [ _x.shape[0] for _x in bags ]
-    min_max_conf = np.array(min_max_conf)
-    logging.debug(f' Number of conformations range between {min_max_conf.min()}-{min_max_conf.max()}')
+    #min_max_conf = [ _x.shape[0] for _x in bags ]
+    #min_max_conf = np.array(min_max_conf)
+    #logging.debug(f' Number of conformations range between {min_max_conf.min()}-{min_max_conf.max()}')
 
     # Save numpy
     np.savez_compressed(
@@ -219,7 +240,7 @@ def prepare_dataset(config):
 # ----------------------------
 # SUBMODULE FOR TRAINING MODEL
 # ----------------------------
-def _scale_data(x_train_val, x_test):
+def _scale_data(method, x_train_val, x_test):
     """ Scale dataset.
 
     Parameters
@@ -233,18 +254,22 @@ def _scale_data(x_train_val, x_test):
     x_test_scaled : numpy array
     """
     from sklearn.preprocessing import MinMaxScaler
-    
+
     scaler = MinMaxScaler()
     scaler.fit(np.vstack(x_train_val))
+    #scaler.fit(np.vstack((x_train_val, x_test)))
     x_train_val_scaled = x_train_val.copy()
     x_test_scaled = x_test.copy()
     
-    for i, bag in enumerate(x_train_val):
-        x_train_val_scaled[i] = scaler.transform(bag)
-    for i, bag in enumerate(x_test):
-        x_test_scaled[i] = scaler.transform(bag)
-    
-    x_train_val_scaled, x_test_scaled = np.array(x_train_val_scaled), np.array(x_test_scaled)
+    if method == "pmapper":
+        for i, bag in enumerate(x_train_val):
+            x_train_val_scaled[i] = scaler.transform(bag)
+        for i, bag in enumerate(x_test):
+            x_test_scaled[i] = scaler.transform(bag)
+        x_train_val_scaled, x_test_scaled = np.array(x_train_val_scaled), np.array(x_test_scaled)
+    else:
+        x_train_val_scaled = scaler.transform(x_train_val)
+        x_test_scaled = scaler.transform(x_test)
     
     return x_train_val_scaled, x_test_scaled
 
@@ -311,8 +336,8 @@ def train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val,
     logging.debug(f" Train model")
 
     # Scaled dataset
-    x_train_val_scaled, x_test_scaled = _scale_data(x_train_val, x_test)
-
+    x_train_val_scaled, x_test_scaled = _scale_data(config["descriptor"]["method"], x_train_val, x_test)
+    
     # Train
     method = config["ml_model"]["method"]
     random_seed = config["option"]["random_seed"]
@@ -367,23 +392,47 @@ def train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val,
             instance_dropout=dropout)
 
     elif method == "RandomForestRegressor":
-        pass
-    elif metho == "RandomForestClassifier":
+        from miqsar.estimators.wrappers_baseline import RandomForestRegressorWrapper
+        search_method = config['ml_model']['search_method']
+        params = config['ml_model']['params']
+        n_cv = config['ml_model']['n_cv']
+        n_iter = config['ml_model']['n_iter']
+        net = RandomForestRegressorWrapper(search_method=search_method, params=params, n_cv=n_cv, n_iter=n_iter, random_seed=random_seed)
+        # Perform hyperparameter tuning before fitting
+        net.fit(x_train_val_scaled, y_train_val)
+
+        #raise NotImplementedError("RandomForestRegressor not supported")
+    elif method == "RandomForestClassifier":
         raise NotImplementedError("RandomForestClassifier not supported")
 
-    # Metrics
-    from sklearn.metrics import r2_score, mean_absolute_error
+    # Predict
     y_pred = net.predict(x_test_scaled)
     y_pred = np.array(y_pred).flatten()
-    
+
     # Save
+    from sklearn.metrics import r2_score
     with open("results.txt", "w") as wf:
         wf.write("{:8s}\t{:8s}\t{:15s}\t{:15s}\n".format("INDEX", "NAME", "EXPERIMENT", "PREDICTION"))
         for i, idx in enumerate(idx_test):
             wf.write("{:8d}\t{:8s}\t{:15.2f}\t{:15.2f}\n".format(i, idx, y_test[i], y_pred[i]))
-    with open("metric.txt", "w") as wf:
-        wf.write('{}/{}: r2_score test = {:.2f}'.format(config["descriptor"]["method"], method, r2_score(y_test, y_pred)))
+    #with open("metric.txt", "w") as wf:
+    #    wf.write('{}/{}: r2_score test = {:.2f}'.format(config["descriptor"]["method"], method, r2_score(y_test, y_pred)))
 
+    # Statistics
+    if "regressor" in method.lower():
+        from miqsar.compute_statistics import calc_errors, mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r
+        statistics = [mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r]
+        # Compute statistics
+        computed_statistics = dict()
+        for statistic in statistics:
+            name = statistic.__doc__
+            computed_statistics[name] = dict()
+            computed_statistics[name]['mle'] = statistic(y_pred, y_test)
+        #for name, value in computed_statistics.items():
+            #print(f"{name:25} {value['mle']:8.4f}")
+        with open("metric.txt", "w") as wf:
+            for name, value in computed_statistics.items():
+                wf.write(f"{name:25} {value['mle']:8.4f}\n")
 
 
 #
