@@ -300,8 +300,9 @@ def _get_params_attention(config):
     return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, dropout
 
 
-def train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test):
-    """ Train model.
+
+def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
+    """ Train model and predict.
 
     Parameters
     ----------
@@ -409,17 +410,20 @@ def train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val,
     y_pred = net.predict(x_test_scaled)
     y_pred = np.array(y_pred).flatten()
 
+    return y_pred
+
+
+def report_result(ml_method, label, idx_test, y_test, y_pred):
+    """ Save result.
+    """
     # Save
-    from sklearn.metrics import r2_score
     with open("results.txt", "w") as wf:
         wf.write("{:8s}\t{:8s}\t{:15s}\t{:15s}\n".format("INDEX", "NAME", "EXPERIMENT", "PREDICTION"))
         for i, idx in enumerate(idx_test):
             wf.write("{:8d}\t{:8s}\t{:15.2f}\t{:15.2f}\n".format(i, idx, y_test[i], y_pred[i]))
-    #with open("metric.txt", "w") as wf:
-    #    wf.write('{}/{}: r2_score test = {:.2f}'.format(config["descriptor"]["method"], method, r2_score(y_test, y_pred)))
-
+    
     # Statistics
-    if "regressor" in method.lower():
+    if "regressor" in ml_method.lower():
         from miqsar.compute_statistics import calc_errors, mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r
         statistics = [mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r]
         # Compute statistics
@@ -433,6 +437,33 @@ def train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val,
         with open("metric.txt", "w") as wf:
             for name, value in computed_statistics.items():
                 wf.write(f"{name:25} {value['mle']:8.4f}\n")
+
+    # Plot
+    import matplotlib as mpl
+    mpl.use('Agg')
+    import seaborn
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=[6,6])
+    plt.scatter(y_test, y_pred, c='k', marker='o', s=10)
+    xmin = min(y_test.min(), y_pred.min()) - 0.5
+    xmax = min(y_test.max(), y_pred.max()) + 0.5
+    plt.plot([xmin, xmax], [xmin, xmax], 'k-', linewidth=1)
+    plt.axis([xmin, xmax, xmin, xmax])
+
+    title = f"{label}"
+    plt.title(title)
+
+    statistics_text = f"N = {len(y_test)} compounds\n"
+    for name, value in computed_statistics.items():
+        statistics_text += f"{name}: {value['mle']:.2f}\n"
+    plt.legend([statistics_text], fontsize=7)
+    
+    plt.xlabel('Experimental potency/affinity')
+    plt.ylabel('Calculated potency/affinity')
+    plt.tight_layout()
+    figure_filename = label + '.pdf'
+    plt.savefig(figure_filename)
+    print(f'Figure written to {figure_filename}')
 
 
 #
@@ -448,15 +479,17 @@ def run(config):
 
     # Calculate descriptors
     calc_descriptors(config)
-
     # Split data into a training and test set
     x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test = prepare_dataset(config)
-    
-    # Train model
-    train_model(config, x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test)
+    # Train and predict
+    y_pred = train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val)
+    # Report
+    ml_method = config['ml_model']['method']
+    label = config['option']['dataset']
+    report_result(ml_method, label, idx_test, y_test, y_pred)
 
 @click.command()
-@click.option("--yaml", required=True, help="yaml file with configuration")
+@click.option("--yaml", required=True, help="yaml file")
 def cli(**kwargs):
     run(kwargs)
 
