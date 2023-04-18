@@ -6,7 +6,7 @@ multi-instance learning approach"](https://pubs.acs.org/doi/10.1021/acs.jcim.1c0
 
 - Support other ML methods to compare with Multi-Instance Learning approach.
 - Add configuration file to run experiments easier.
-- Add statistical report (mean signed error, root mean squared error, mean unsigned error, kendall tau, pearson r)
+- Add statistical report
 
 
 ## Overview
