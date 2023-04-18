@@ -1,0 +1,25 @@
+option:
+  path_to_dataset: ../../../datasets
+  dataset: CHEMBL1075104
+  random_seed: 43
+  train_val_test_ratio: [0.8, 0.1, 0.1]
+
+
+# Descriptor method supports [pmapper, rdkit_morgan, rdkit_2d]
+descriptor: 
+  method: pmapper        # Options are [ pmapper, rdkit_morgan, rdkit_2d ]. If rdkit descriptor is chosen, all other options will be ignored
+  energy_threshold: 10   # Conformers with energy difference from the lowest found one higher than the specifie. Default is 10 kcal/mol 
+  n_confomration: 5      # Number of generated conformers. Default is 5.
+  rms_threshold: 0.5     # Only conformers with RMSD higher then threshold will be kept. Default is 0.5 angstroms.
+
+
+# ML model wrapper
+ml_model:
+  method: BagWrapperMLPRegressor
+  hidden_layer_units:  [256, 128, 64]
+  pool: mean
+  n_epoch: 100
+  lr: 0.001
+  weight_decay: 0.0
+  batch_size: 128
+  dropout: 0
