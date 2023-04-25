@@ -1,0 +1,24 @@
+option:
+  path_to_dataset: /home/takabak/data/3dmil-test/datasets
+  dataset: @@@DATASET@@@
+  random_seed: 43
+  train_val_test_ratio: [0.8, 0.1, 0.1]
+
+
+# Descriptor method supports [pmapper, rdkit_morgan, rdkit_2d]
+descriptor: 
+  method: rdkit_morgan    # Options are [ pmapper, rdkit_morgan, rdkit_2d ]. If rdkit descriptor is chosen, all other options will be ignored.
+
+
+# ML model wrapper
+ml_model:
+  method: RandomForestRegressor
+  search_method: random   # [grid, random]
+  params:
+    n_estimators: [10, 20]  #[10, 50, 100, 200, 400]
+    max_features: ['sqrt', 'log2']
+    max_depth: [3, 4]       #[3, 4, 5, 6, 7, None]
+    #min_samples_leaf: [1, 2, 4]
+    #min_samples_split: [2, 5, 10]
+  n_cv: 3     # Number of cross validation. Default is 3.
+  n_iter: 10  # Number of iterations for random hyperparameter search. Will be ignored when using grid search. Default is 100.
