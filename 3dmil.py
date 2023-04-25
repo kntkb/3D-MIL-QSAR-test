@@ -25,6 +25,9 @@ def calc_descriptors(config):
     method = config["descriptor"]["method"]
     filename = os.path.join(config["option"]["path_to_dataset"], config["option"]["dataset"] + ".smi")
 
+    if not os.path.exists('descriptor'):
+        os.mkdir('descriptor')
+
     if method == "pmapper":
         calc_pmapper(filename, config)
     elif method == "rdkit_2d":
@@ -73,42 +76,24 @@ def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=
             nconfs = config["descriptor"][key]
         if key == rms_threshold:
             rms_threshold = config["descriptor"][key]
-
-    # Settings
     nconfs_list = [1, nconfs]
-    ncpu = ncpu
-    dataset_file = filename
-    descriptor_folder = os.path.join('descriptor')
-    if not os.path.exists('descriptor'):
-        os.mkdir('descriptor')
-
     from miqsar.utils import calc_3d_pmapper
-    out_fname = calc_3d_pmapper(input_fname=dataset_file, nconfs_list=nconfs_list, energy=energy_threshold,  descr_num=[4],
-                                path=descriptor_folder, ncpu=ncpu)
+    out_fname = calc_3d_pmapper(input_fname=filename, nconfs_list=nconfs_list, energy=energy_threshold,  descr_num=[4],
+                                path='descriptor', ncpu=ncpu)
 
 
 def calc_rdkit_2d(filename):
     """ Calculate 2D descriptors using RDKit.
     """
-    dataset_file = filename
-    descriptor_folder = os.path.join('descriptor')
-    if not os.path.exists('descriptor'):
-        os.mkdir('descriptor')
-
     from miqsar.descriptor_calculation.rdkit_2d import calc_2d_descriptors
-    out_path = calc_2d_descriptors(fname=dataset_file, path=descriptor_folder)
+    out_path = calc_2d_descriptors(fname=filename, path='descriptor')
 
 
 def calc_rdkit_morgan(filename):
     """ Calculate morgan fingerprint using RDKit.
     """
-    dataset_file = filename
-    descriptor_folder = os.path.join('descriptor')
-    if not os.path.exists('descriptor'):
-        os.mkdir('descriptor')
-
     from miqsar.descriptor_calculation.rdkit_morgan import calc_morgan_descriptors
-    out_path = calc_morgan_descriptors(fname=dataset_file, path=descriptor_folder)
+    out_path = calc_morgan_descriptors(fname=filename, path='descriptor')
 
 
 # ----------------------------
@@ -125,9 +110,8 @@ def _str_to_vec(dsc_str, dsc_num):
     return vec
 
 
-def _load_descriptor_file():
-    #descriptor_filename = os.path.join('descriptors', 'PhFprPmapper_conf-CHEMBL1075104_5.txt')
-    descriptor_file = glob.glob('descriptor/*.txt')
+def _load_descriptor_file(descriptor_path):
+    descriptor_file = glob.glob(descriptor_path + '/*.txt')
     descriptor_file.sort()
     descriptor_file = descriptor_file[-1]
 
@@ -144,8 +128,8 @@ def _load_descriptor_file():
     return dsc_tmp, mol_names
 
 
-def _load_descriptor_file_rdkit():
-    descriptor_file = glob.glob('descriptor/*.csv')[0]
+def _load_descriptor_file_rdkit(descriptor_path):
+    descriptor_file = glob.glob(descriptor_path + '/*.csv')[0]
     df = pd.read_csv(descriptor_file, sep=",")
     colnames = df.columns.to_list()
 
@@ -181,10 +165,11 @@ def prepare_dataset(config):
     idx_test : numpy array
     """
     logging.debug(f" Prepare datasets")
+    descriptor_path = config['descriptor']['path']
 
     if config["descriptor"]["method"] == "pmapper":
         #
-        dsc_tmp, mol_names = _load_descriptor_file()
+        dsc_tmp, mol_names = _load_descriptor_file(descriptor_path)
 
         # 
         labels_tmp = [float(i.split(':')[1]) for i in mol_names]
@@ -207,7 +192,7 @@ def prepare_dataset(config):
         bags, labels, idx = np.array(bags, dtype='object'), np.array(labels), np.array(idx)
         logging.debug(f' There are {len(bags)} molecules encoded with {bags[0].shape[1]} descriptors')
     elif config["descriptor"]["method"].startswith("rdkit"):
-        bags, labels, idx = _load_descriptor_file_rdkit()
+        bags, labels, idx = _load_descriptor_file_rdkit(descriptor_path)
 
     # Split dataset
     from sklearn.model_selection import train_test_split
@@ -298,7 +283,6 @@ def _get_params_attention(config):
     dropout = config_ml["dropout"]
 
     return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, dropout
-
 
 
 def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
@@ -407,46 +391,63 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
         raise NotImplementedError("RandomForestClassifier not supported")
 
     # Predict
-    y_pred = net.predict(x_test_scaled)
-    y_pred = np.array(y_pred).flatten()
+    y_test_pred = net.predict(x_test_scaled)
+    y_test_pred = np.array(y_test_pred).flatten()
+    y_train_val_pred = net.predict(x_train_val_scaled)
+    y_train_val_pred = np.array(y_train_val_pred).flatten()
 
-    return y_pred
+    return y_test_pred, y_train_val_pred
 
 
-def report_result(ml_method, label, idx_test, y_test, y_pred):
+# -------------------------------
+# SUBMODULE FOR REPORTING RESULTS
+# -------------------------------
+def _calc_statistics(y_exp, y_pred, suffix):
+    """
+    """
+    from miqsar.compute_statistics import calc_errors, mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r
+    statistics = [mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r]
+    computed_statistics = dict()
+    for statistic in statistics:
+        name = statistic.__doc__
+        computed_statistics[name] = dict()
+        computed_statistics[name]['mle'] = statistic(y_pred, y_exp)
+    with open(f"metric_{suffix}.txt", "w") as wf:
+        for name, value in computed_statistics.items():
+            wf.write(f"{name:25} {value['mle']:8.4f}\n")
+    return computed_statistics
+
+
+def _export_results(idx, y_exp, y_pred, suffix):
+    """
+    """
+    with open(f"results_{suffix}.txt", "w") as wf:
+        wf.write("{:8s}\t{:8s}\t{:15s}\t{:15s}\n".format("INDEX", "NAME", "EXPERIMENT", "PREDICTION"))
+        for i, name in enumerate(idx):
+            wf.write("{:8d}\t{:8s}\t{:15.2f}\t{:15.2f}\n".format(i, name, y_exp[i], y_pred[i]))
+
+
+def report_result(ml_method, label, idx_test, y_test, y_test_pred, idx_train_val, y_train_val, y_train_val_pred):
     """ Save result.
     """
-    # Save
-    with open("results.txt", "w") as wf:
-        wf.write("{:8s}\t{:8s}\t{:15s}\t{:15s}\n".format("INDEX", "NAME", "EXPERIMENT", "PREDICTION"))
-        for i, idx in enumerate(idx_test):
-            wf.write("{:8d}\t{:8s}\t{:15.2f}\t{:15.2f}\n".format(i, idx, y_test[i], y_pred[i]))
-    
+    # Export
+    _export_results(idx_train_val, y_train_val, y_train_val_pred, suffix="train_val")
+    _export_results(idx_test, y_test, y_test_pred, suffix="test")
+
     # Statistics
     if "regressor" in ml_method.lower():
-        from miqsar.compute_statistics import calc_errors, mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r
-        statistics = [mean_signed_error, root_mean_squared_error, mean_unsigned_error, kendall_tau, pearson_r]
-        # Compute statistics
-        computed_statistics = dict()
-        for statistic in statistics:
-            name = statistic.__doc__
-            computed_statistics[name] = dict()
-            computed_statistics[name]['mle'] = statistic(y_pred, y_test)
-        #for name, value in computed_statistics.items():
-            #print(f"{name:25} {value['mle']:8.4f}")
-        with open("metric.txt", "w") as wf:
-            for name, value in computed_statistics.items():
-                wf.write(f"{name:25} {value['mle']:8.4f}\n")
+        computed_statistics_train_val = _calc_statistics(y_train_val, y_train_val_pred, suffix="train_val")
+        computed_statistics_test = _calc_statistics(y_test, y_test_pred, suffix="test")
 
-    # Plot
+    # Plot (Test dataset only)
     import matplotlib as mpl
     mpl.use('Agg')
     import seaborn
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=[6,6])
-    plt.scatter(y_test, y_pred, c='k', marker='o', s=10)
-    xmin = min(y_test.min(), y_pred.min()) - 0.5
-    xmax = min(y_test.max(), y_pred.max()) + 0.5
+    plt.scatter(y_test, y_test_pred, c='k', marker='o', s=10)
+    xmin = min(y_test.min(), y_test_pred.min()) - 0.5
+    xmax = min(y_test.max(), y_test_pred.max()) + 0.5
     plt.plot([xmin, xmax], [xmin, xmax], 'k-', linewidth=1)
     plt.axis([xmin, xmax, xmin, xmax])
 
@@ -454,14 +455,16 @@ def report_result(ml_method, label, idx_test, y_test, y_pred):
     plt.title(title)
 
     statistics_text = f"N = {len(y_test)} compounds\n"
-    for name, value in computed_statistics.items():
+    for name, value in computed_statistics_test.items():
         statistics_text += f"{name}: {value['mle']:.2f}\n"
     plt.legend([statistics_text], fontsize=7)
     
     plt.xlabel('Experimental potency/affinity')
     plt.ylabel('Calculated potency/affinity')
     plt.tight_layout()
-    figure_filename = label + '.pdf'
+    figure_filename = ml_method.lower() + "_" + label + '.pdf'
+    plt.savefig(figure_filename)
+    figure_filename = ml_method.lower() + "_" + label + '.png'
     plt.savefig(figure_filename)
     print(f'Figure written to {figure_filename}')
 
@@ -477,16 +480,21 @@ def run(config):
         config = yaml.safe_load(f)
     logging.debug(f' Configuration {config}')
 
-    # Calculate descriptors
-    calc_descriptors(config)
+    # Calculate descriptors if descriptor path is not specified
+    if "path" in config['descriptor'].keys():
+        if not os.path.exists(config['descriptor']['path']):
+            raise FileNotFoundError("Descriptor path specified but could not find directory")
+    else:
+        config['descriptor']['path'] = './descriptor'
+        calc_descriptors(config)
     # Split data into a training and test set
     x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test = prepare_dataset(config)
     # Train and predict
-    y_pred = train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val)
+    y_test_pred, y_train_val_pred = train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val)
     # Report
     ml_method = config['ml_model']['method']
     label = config['option']['dataset']
-    report_result(ml_method, label, idx_test, y_test, y_pred)
+    report_result(ml_method, label, idx_test, y_test, y_test_pred, idx_train_val, y_train_val, y_train_val_pred)
 
 @click.command()
 @click.option("--yaml", required=True, help="yaml file")
