@@ -1,7 +1,9 @@
 import numpy as np
 import scipy
 
-
+"""
+https://github.com/choderalab/espaloma_charge/blob/main/scripts/hydration-free-energies/hydration.py#L591
+"""
 def calc_errors(y_pred, y):
     errors = y_pred - y
     return errors
