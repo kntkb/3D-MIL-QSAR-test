@@ -1,0 +1,364 @@
+classA_lipid_ta2r_potency
+----------------------
+# Full data
+Number of data: 510
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pEC50', 'EC50', 'IC50', 'pIC50', 'Ki', 'Kd']
+Value range: 4.00-10.80
+Found 42 assay measurements with values 4, 5, or 6. Remove from data.
+# IC50
+Number of data: 308
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['IC50']
+Value range: 4.10-10.80
+# Kd
+Number of data: 111
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['Kd']
+Value range: 4.90-9.50
+
+
+classA_lipid_cnr1_potency
+----------------------
+# Full data
+Number of data: 1948
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pEC50', 'pIC50', 'EC50', 'IC50', 'Ki', 'Kd']
+Value range: 4.00-10.70
+Found 112 assay measurements with values 4, 5, or 6. Remove from data.
+# EC50
+Number of data: 989
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50']
+Value range: 4.40-10.70
+# IC50
+Number of data: 608
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['IC50']
+Value range: 4.50-9.90
+# Kd
+Number of data: 144
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['Kd']
+Value range: 6.10-9.90
+
+
+classA_lipid_s1prc1_affinity
+----------------------
+# Full data
+Number of data: 852
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50', 'pIC50', 'EC50', 'pKd', 'pKi', 'Ki', 'Kd']
+Value range: 4.30-11.00
+Found 20 assay measurements with values 4, 5, or 6. Remove from data.
+# IC50
+Number of data: 365
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50']
+Value range: 4.80-11.00
+# EC50
+Number of data: 362
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['EC50']
+Value range: 4.30-10.00
+
+
+classA_lipid_cnr2_affinity
+----------------------
+# Full data
+Number of data: 5077
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['pKi', 'Ki', 'IC50', 'EC50', 'pKd', 'Kd']
+Value range: 4.00-10.80
+Found 307 assay measurements with values 4, 5, or 6. Remove from data.
+# pKi
+Number of data: 272
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['pKi']
+Value range: 5.10-10.10
+<WARNING> Removed 2 duplicate SMILES/MOLNAME from data set.
+# Ki
+Number of data: 3576
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Ki']
+Value range: 4.10-10.80
+# IC50
+Number of data: 724
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50']
+Value range: 4.30-9.40
+# EC50
+Number of data: 196
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['EC50']
+Value range: 4.20-10.80
+
+
+classA_lipid_ffar1_potency
+----------------------
+# Full data
+Number of data: 1439
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pEC50', 'EC50', 'pIC50', 'IC50']
+Value range: 3.00-10.00
+Found 64 assay measurements with values 4, 5, or 6. Remove from data.
+# EC50
+Number of data: 1283
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50']
+Value range: 4.20-10.00
+
+
+classA_lipid_gp119_affinity
+----------------------
+# Full data
+Number of data: 149
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['EC50', 'Ki', 'IC50']
+Value range: 5.30-9.00
+Found 3 assay measurements with values 4, 5, or 6. Remove from data.
+
+
+classA_lipid_cnr2_potency
+----------------------
+# Full data
+Number of data: 2985
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50', 'pEC50', 'Ki', 'IC50', 'pIC50', 'Kd']
+Value range: 4.00-10.40
+Found 73 assay measurements with values 4, 5, or 6. Remove from data.
+# EC50
+Number of data: 2601
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50']
+Value range: 4.40-10.40
+# IC50
+Number of data: 279
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['IC50']
+Value range: 4.50-9.80
+
+
+classA_lipid_ta2r_affinity
+----------------------
+# Full data
+Number of data: 649
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['pKi', 'Ki', 'IC50', 'pKd', 'Kd', 'EC50', 'pIC50']
+Value range: 4.00-10.30
+Found 44 assay measurements with values 4, 5, or 6. Remove from data.
+# Ki
+Number of data: 288
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Ki']
+Value range: 4.10-9.10
+# IC50
+Number of data: 167
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50']
+Value range: 4.10-9.90
+# Kd
+Number of data: 103
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Kd']
+Value range: 4.90-10.30
+
+
+classA_lipid_ffar1_affinity
+----------------------
+# Full data
+Number of data: 374
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Kd', 'EC50', 'Ki', 'pKd', 'IC50']
+Value range: 4.20-9.10
+Found 7 assay measurements with values 4, 5, or 6. Remove from data.
+# EC50
+Number of data: 205
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['EC50']
+Value range: 4.20-9.10
+# Ki
+Number of data: 129
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Ki']
+Value range: 4.60-9.00
+
+
+classA_lipid_pd2r2_potency
+----------------------
+# Full data
+Number of data: 851
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pEC50', 'IC50', 'EC50', 'Ki', 'pIC50']
+Value range: 4.10-10.90
+Found 15 assay measurements with values 4, 5, or 6. Remove from data.
+# IC50
+Number of data: 736
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['IC50']
+Value range: 4.10-10.90
+
+
+classA_lipid_pd2r2_affinity
+----------------------
+# Full data
+Number of data: 2640
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['pKi', 'pIC50', 'IC50', 'Ki', 'pKd', 'Kd']
+Value range: 4.20-10.70
+Found 51 assay measurements with values 4, 5, or 6. Remove from data.
+# IC50
+Number of data: 1583
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50']
+Value range: 4.20-10.70
+# Ki
+Number of data: 970
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Ki']
+Value range: 4.70-10.00
+
+
+classA_lipid_cnr1_affinity
+----------------------
+# Full data
+Number of data: 4375
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['pKi', 'Ki', 'EC50', 'pKd', 'IC50', 'Kd']
+Value range: 4.00-10.80
+Found 190 assay measurements with values 4, 5, or 6. Remove from data.
+# pKi
+Number of data: 427
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['pKi']
+Value range: 5.10-10.00
+<WARNING> Removed 3 duplicate SMILES/MOLNAME from data set.
+# Ki
+Number of data: 2683
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['Ki']
+Value range: 4.10-10.80
+# EC50
+Number of data: 306
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['EC50']
+Value range: 4.40-9.10
+# IC50
+Number of data: 730
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50']
+Value range: 4.10-9.70
+
+
+classA_lipid_s1prc3_affinity
+----------------------
+# Full data
+Number of data: 434
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50', 'EC50', 'pIC50', 'pKd', 'pKi', 'Ki']
+Value range: 4.20-9.50
+Found 29 assay measurements with values 4, 5, or 6. Remove from data.
+# IC50
+Number of data: 308
+Unique species: ['Human']
+Unique assay type: ['Binding']
+Unique assay value: ['IC50']
+Value range: 4.20-9.50
+
+
+classA_lipid_s1prc1_potency
+----------------------
+# Full data
+Number of data: 1960
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pIC50', 'IC50', 'pEC50', 'EC50', 'Ki', 'pA2']
+Value range: 4.00-11.10
+Found 55 assay measurements with values 4, 5, or 6. Remove from data.
+# IC50
+Number of data: 232
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['IC50']
+Value range: 4.20-10.30
+# EC50
+Number of data: 1602
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50']
+Value range: 4.30-11.00
+
+
+classA_lipid_gp119_potency
+----------------------
+# Full data
+Number of data: 1557
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pEC50', 'EC50', 'IC50', 'Ki']
+Value range: 4.80-9.70
+Found 56 assay measurements with values 4, 5, or 6. Remove from data.
+# EC50
+Number of data: 1461
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50']
+Value range: 4.80-9.70
+
+
+classA_lipid_s1prc3_potency
+----------------------
+# Full data
+Number of data: 705
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['pEC50', 'EC50', 'pIC50', 'pA2', 'IC50']
+Value range: 4.00-9.80
+Found 66 assay measurements with values 4, 5, or 6. Remove from data.
+# EC50
+Number of data: 587
+Unique species: ['Human']
+Unique assay type: ['Functional']
+Unique assay value: ['EC50']
+Value range: 4.30-9.80
+
+
