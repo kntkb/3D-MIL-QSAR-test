@@ -63,12 +63,10 @@ def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=
         Energy threshold for conformer generation. Units in kcal/mol.
     ncpu : int, default=1
         Number of CPU cores.
-
+        
     Returns
     -------
     """
-    logging.debug(f" Calculate 3D-pmapper descriptors")
-
     for key in config["descriptor"]:
         if key == "energy_threshold":
             energy_threshold = config["descriptor"][key]
@@ -78,7 +76,7 @@ def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=
             rms_threshold = config["descriptor"][key]
     nconfs_list = [1, nconfs]
     from miqsar.utils import calc_3d_pmapper
-    out_fname = calc_3d_pmapper(input_fname=filename, nconfs_list=nconfs_list, energy=energy_threshold,  descr_num=[4],
+    out_fname = calc_3d_pmapper(input_fname=filename, nconfs_list=nconfs_list, energy=energy_threshold,  descr_num=[4], 
                                 path='descriptor', ncpu=ncpu)
 
 
@@ -111,9 +109,9 @@ def _str_to_vec(dsc_str, dsc_num):
 
 
 def _load_descriptor_file(descriptor_path):
-    descriptor_file = glob.glob(descriptor_path + '/*.txt')
-    descriptor_file.sort()
-    descriptor_file = descriptor_file[-1]
+    descriptor_files = glob.glob(descriptor_path + '/*.txt')
+    descriptor_files.sort()
+    descriptor_file = descriptor_files[-1]   # multiple conformation file
 
     # Check extension
     assert os.path.splitext(descriptor_file)[-1] == '.txt'
@@ -178,7 +176,10 @@ def prepare_dataset(config):
         
         # 
         bags, labels, idx = [], [], []
-        for mol_idx in list(np.unique(idx_tmp)):
+        _arr, _idx = np.unique(idx_tmp, return_index=True)  # preserve order
+        idx_tmp_unique = _arr[np.argsort(_idx)]
+        #for mol_idx in list(np.unique(idx_tmp)):
+        for mol_idx in idx_tmp_unique:
             bag, labels_, idx_ = [], [], []
             for dsc_str, label, i in zip(dsc_tmp, labels_tmp, idx_tmp):
                 if i == mol_idx:
@@ -196,7 +197,7 @@ def prepare_dataset(config):
 
     # Split dataset
     from sklearn.model_selection import train_test_split
-    # Note: train_test_split will return [n_confs, n_desriptors]. n_confs can differ among molecules meaning that the array is hetero array.
+    # Note: train_test_split will return a hetero array [n_confs, n_desriptors]. n_confs can differ among molecules.
     random_seed = config["option"]["random_seed"]
     train_val_test_ratio = config["option"]["train_val_test_ratio"]
     test_size = train_val_test_ratio[-1]
@@ -259,7 +260,7 @@ def _scale_data(method, x_train_val, x_test):
     return x_train_val_scaled, x_test_scaled
 
 
-def _get_params(config):
+def _get_params_wrapper(config):
     config_ml = config["ml_model"]
     hidden_layer_units = config_ml["hidden_layer_units"]
     pool = config_ml["pool"]
@@ -272,6 +273,18 @@ def _get_params(config):
     return hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout
 
 
+def _get_params_net(config):
+    config_ml = config["ml_model"]
+    hidden_layer_units = config_ml["hidden_layer_units"]
+    pool = config_ml["pool"]
+    n_epoch = config_ml["n_epoch"]
+    lr = config_ml["lr"]
+    weight_decay = config_ml["weight_decay"]
+    batch_size = config_ml["batch_size"]
+
+    return hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size
+
+
 def _get_params_attention(config):
     config_ml = config["ml_model"]
     hidden_layer_units = config_ml["hidden_layer_units"]
@@ -280,9 +293,9 @@ def _get_params_attention(config):
     lr = config_ml["lr"]
     weight_decay = config_ml["weight_decay"]
     batch_size = config_ml["batch_size"]
-    dropout = config_ml["dropout"]
+    instance_dropout = config_ml["instance_dropout"]
 
-    return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, dropout
+    return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, instance_dropout
 
 
 def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
@@ -330,7 +343,7 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
     if method in ["InstanceWrapperMLPRegressor", "BagWrapperMLPRegressor", "InstanceWrapperMLPClassifier", "BagWrapperMLPClassifier"]:
         from miqsar.estimators.utils import set_seed
         set_seed(random_seed)
-        hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout = _get_params(config)
+        hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout = _get_params_wrapper(config)
         input_unit = x_train_val_scaled[0].shape[1]
         hidden_layer_units.insert(0, input_unit)
         ndim = tuple(hidden_layer_units)
@@ -354,10 +367,35 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
             batch_size=batch_size,
             dropout=dropout)
 
+    elif method in ["InstanceNetRegressor", "BagNetRegressor", "InstanceNetClassifier", "BagNetPClassifier"]:
+        from miqsar.estimators.utils import set_seed
+        set_seed(random_seed)
+        hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size =  _get_params_net(config)
+        input_unit = x_train_val_scaled[0].shape[1]
+        hidden_layer_units.insert(0, input_unit)
+        ndim = tuple(hidden_layer_units)
+
+        from miqsar.estimators.mi_nets import InstanceNetRegressor, BagNetRegressor
+        if method == "InstanceNetRegressor":
+            net = InstanceNetRegressor(ndim=ndim, pool=pool, init_cuda=True)
+        elif method == "BagNetRegressor":
+            net = BagNetRegressor(ndim=ndim, pool=pool, init_cuda=True)
+        elif method == "InstanceNetClassifier":
+            raise NotImplementedError("InstanceNetClassifier not supported")
+        elif method == "BagNetClassifier":
+            raise NotImplementedError("BagNetClassifierr not supported")
+
+        net.fit(x_train_val_scaled, y_train_val, 
+            n_epoch=n_epoch, 
+            lr=lr,
+            weight_decay=weight_decay,
+            batch_size=batch_size,
+            )
+
     elif method in ["AttentionNetRegressor", "AttentionNetClassifier"]:
         from miqsar.estimators.utils import set_seed
         set_seed(random_seed)
-        hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, dropout =  _get_params_attention(config)
+        hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, instance_dropout =  _get_params_attention(config)
         input_unit = x_train_val_scaled[0].shape[1]
         hidden_layer_units.insert(0, input_unit)
         ndim = tuple(hidden_layer_units)
@@ -366,7 +404,6 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
         if method == "AttentionNetRegressor":
             net = AttentionNetRegressor(ndim=ndim, det_ndim=det_ndim, init_cuda=True)
         elif method == "AttentionNetClassifier":
-            #net = AttentionNetClassifier(ndim=ndim, det_ndim=det_ndim, init_cuda=True)
             raise NotImplementedError("AttentionNetClassifier not supported")
 
         net.fit(x_train_val_scaled, y_train_val, 
@@ -374,7 +411,7 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
             lr=lr,
             weight_decay=weight_decay,
             batch_size=batch_size,
-            instance_dropout=dropout)
+            instance_dropout=instance_dropout)
 
     elif method == "RandomForestRegressor":
         from miqsar.estimators.wrappers_baseline import RandomForestRegressorWrapper
@@ -383,10 +420,9 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
         n_cv = config['ml_model']['n_cv']
         n_iter = config['ml_model']['n_iter']
         net = RandomForestRegressorWrapper(search_method=search_method, params=params, n_cv=n_cv, n_iter=n_iter, random_seed=random_seed)
-        # Perform hyperparameter tuning before fitting
+        # Automatic hyperparameter search performed before fitting
         net.fit(x_train_val_scaled, y_train_val)
 
-        #raise NotImplementedError("RandomForestRegressor not supported")
     elif method == "RandomForestClassifier":
         raise NotImplementedError("RandomForestClassifier not supported")
 
@@ -439,34 +475,36 @@ def report_result(ml_method, label, idx_test, y_test, y_test_pred, idx_train_val
         computed_statistics_train_val = _calc_statistics(y_train_val, y_train_val_pred, suffix="train_val")
         computed_statistics_test = _calc_statistics(y_test, y_test_pred, suffix="test")
 
-    # Plot (Test dataset only)
-    import matplotlib as mpl
-    mpl.use('Agg')
-    import seaborn
-    import matplotlib.pyplot as plt
-    fig = plt.figure(figsize=[6,6])
-    plt.scatter(y_test, y_test_pred, c='k', marker='o', s=10)
-    xmin = min(y_test.min(), y_test_pred.min()) - 0.5
-    xmax = min(y_test.max(), y_test_pred.max()) + 0.5
-    plt.plot([xmin, xmax], [xmin, xmax], 'k-', linewidth=1)
-    plt.axis([xmin, xmax, xmin, xmax])
+        # Plot (Test data only)
+        import matplotlib as mpl
+        mpl.use('Agg')
+        import seaborn
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=[6,6])
+        plt.scatter(y_test, y_test_pred, c='k', marker='o', s=10)
+        xmin = min(y_test.min(), y_test_pred.min()) - 1.0
+        xmax = min(y_test.max(), y_test_pred.max()) + 1.0
+        plt.plot([xmin, xmax], [xmin, xmax], 'k-', linewidth=1)
+        #x = np.linspace(xmin, xmax, num=5)
+        #plt.fill_between(x, x-1, x+1, alpha=0.2)
+        plt.axis([xmin, xmax, xmin, xmax])
 
-    title = f"{label}"
-    plt.title(title)
+        title = f"{label}\n{ml_method.strip('Regressor')}"
+        plt.title(title)
 
-    statistics_text = f"N = {len(y_test)} compounds\n"
-    for name, value in computed_statistics_test.items():
-        statistics_text += f"{name}: {value['mle']:.2f}\n"
-    plt.legend([statistics_text], fontsize=7)
-    
-    plt.xlabel('Experimental potency/affinity')
-    plt.ylabel('Calculated potency/affinity')
-    plt.tight_layout()
-    figure_filename = ml_method.lower() + "_" + label + '.pdf'
-    plt.savefig(figure_filename)
-    figure_filename = ml_method.lower() + "_" + label + '.png'
-    plt.savefig(figure_filename)
-    print(f'Figure written to {figure_filename}')
+        statistics_text = f"N = {len(y_test)} compounds\n"
+        for name, value in computed_statistics_test.items():
+            statistics_text += f"{name}: {value['mle']:.2f}\n"
+        plt.legend([statistics_text], fontsize=7)
+        
+        plt.xlabel('Experimental')
+        plt.ylabel('Calculated')
+        plt.tight_layout()
+        figure_filename = ml_method + "_" + label + '.pdf'
+        plt.savefig(figure_filename)
+        figure_filename = ml_method + "_" + label + '.png'
+        plt.savefig(figure_filename)
+        print(f'Figure written to {figure_filename}')
 
 
 #
