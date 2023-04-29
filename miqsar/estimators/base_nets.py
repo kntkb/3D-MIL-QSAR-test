@@ -236,6 +236,7 @@ class BaseNet(nn.Module):
                 if verbose:
                     print(epoch, loss)
         self.load_state_dict(best_parameters, strict=True)
+        torch.save(best_parameter, "model.th")
         return self
 
     def predict(self, x: Union[Sequence[Union[Sequence, np.array]], np.array]) -> np.array:

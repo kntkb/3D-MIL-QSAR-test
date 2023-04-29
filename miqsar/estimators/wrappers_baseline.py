@@ -36,6 +36,10 @@ class RandomForestRegressorWrapper():
         search_model.fit(x, y)
         logging.debug(f"Best model parameters: {search_model.best_params_}")
         self.best_model = search_model.best_estimator_
+        
+        import joblib
+        joblib.dump(self.best_model, "model.joblib")
+
         return self
 
     def predict(self, x):
