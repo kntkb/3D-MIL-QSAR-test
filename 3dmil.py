@@ -36,7 +36,7 @@ def calc_descriptors(config):
         calc_rdkit_morgan(filename)
 
 
-def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=0.5, ncpu=1):
+def calc_pmapper(filename, config):
     """
     Calculate descriptors. 
     
@@ -72,12 +72,17 @@ def calc_pmapper(filename, config, energy_threshold=10, nconfs=5, rms_threshold=
             energy_threshold = config["descriptor"][key]
         if key == "n_conformation":
             nconfs = config["descriptor"][key]
-        if key == rms_threshold:
+        if key == "rms_threshold":
             rms_threshold = config["descriptor"][key]
+        #if key == "remove":
+        #    remove = config["descriptor"][key]
+        #if key == "stereo":
+        #    steore = config["descriptor"][key]
     nconfs_list = [1, nconfs]
     from miqsar.utils import calc_3d_pmapper
-    out_fname = calc_3d_pmapper(input_fname=filename, nconfs_list=nconfs_list, energy=energy_threshold,  descr_num=[4], 
-                                path='descriptor', ncpu=ncpu)
+    # stereo is always set to False, because this seems to raise errors when stereo=True
+    out_fname = calc_3d_pmapper(input_fname=filename, nconfs_list=nconfs_list, energy=energy_threshold, rms=rms_threshold, 
+                                stereo=False, descr_num=[4], remove=0.05, ncpu=4, path='descriptor')
 
 
 def calc_rdkit_2d(filename):
@@ -210,15 +215,15 @@ def prepare_dataset(config):
     #logging.debug(f' Number of conformations range between {min_max_conf.min()}-{min_max_conf.max()}')
 
     # Save numpy
-    np.savez_compressed(
-        file='input.npz', 
-        x_train_val=x_train_val,
-        x_test=x_test,
-        y_train_val=y_train_val,
-        y_test=y_test,
-        idx_train_val=idx_train_val,
-        idx_test=idx_test
-        )
+    #np.savez_compressed(
+    #    file='input.npz', 
+    #    x_train_val=x_train_val,
+    #    x_test=x_test,
+    #    y_train_val=y_train_val,
+    #    y_test=y_test,
+    #    idx_train_val=idx_train_val,
+    #    idx_test=idx_test
+    #    )
 
     return x_train_val, x_test, y_train_val, y_test, idx_train_val, idx_test
 
@@ -281,9 +286,10 @@ def _get_params_net(config):
     lr = config_ml["lr"]
     weight_decay = config_ml["weight_decay"]
     batch_size = config_ml["batch_size"]
+    dropout = config_ml["dropout"]
 
-    return hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size
-
+    return hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout
+    
 
 def _get_params_attention(config):
     config_ml = config["ml_model"]
@@ -294,8 +300,9 @@ def _get_params_attention(config):
     weight_decay = config_ml["weight_decay"]
     batch_size = config_ml["batch_size"]
     instance_dropout = config_ml["instance_dropout"]
+    dropout = config_ml["dropout"]
 
-    return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, instance_dropout
+    return hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, instance_dropout, dropout
 
 
 def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
@@ -350,36 +357,33 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
 
         from miqsar.estimators.wrappers import InstanceWrapperMLPRegressor, BagWrapperMLPRegressor
         if method == "InstanceWrapperMLPRegressor":
-            net = InstanceWrapperMLPRegressor(ndim=ndim, pool=pool, init_cuda=True)
+            net = InstanceWrapperMLPRegressor(ndim=ndim, p=dropout, pool=pool, init_cuda=True)
         elif method == "BagWrapperMLPRegressor":
-            net = BagWrapperMLPRegressor(ndim=ndim, pool=pool, init_cuda=True)
+            net = BagWrapperMLPRegressor(ndim=ndim, p=dropout, pool=pool, init_cuda=True)
         elif method == "InstanceWrapperMLPClassifier":
-            #net = InstanceWrapperMLPClassifier(ndim=ndim, pool=pool, init_cuda=True)
             raise NotImplementedError("InstanceWrapperMLPClassifier not supported")
         elif method == "BagWrapperMLPClassifier":
-            #net = BagWrapperMLPClassifier(ndim=ndim, pool=pool, init_cuda=True)
             raise NotImplementedError("BagWrapperMLPClassifierr not supported")
 
         net.fit(x_train_val_scaled, y_train_val, 
             n_epoch=n_epoch, 
             lr=lr,
             weight_decay=weight_decay,
-            batch_size=batch_size,
-            dropout=dropout)
+            batch_size=batch_size)
 
     elif method in ["InstanceNetRegressor", "BagNetRegressor", "InstanceNetClassifier", "BagNetPClassifier"]:
         from miqsar.estimators.utils import set_seed
         set_seed(random_seed)
-        hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size =  _get_params_net(config)
+        hidden_layer_units, pool, n_epoch, lr, weight_decay, batch_size, dropout =  _get_params_net(config)
         input_unit = x_train_val_scaled[0].shape[1]
         hidden_layer_units.insert(0, input_unit)
         ndim = tuple(hidden_layer_units)
 
         from miqsar.estimators.mi_nets import InstanceNetRegressor, BagNetRegressor
         if method == "InstanceNetRegressor":
-            net = InstanceNetRegressor(ndim=ndim, pool=pool, init_cuda=True)
+            net = InstanceNetRegressor(ndim=ndim, p=dropout, pool=pool, init_cuda=True)
         elif method == "BagNetRegressor":
-            net = BagNetRegressor(ndim=ndim, pool=pool, init_cuda=True)
+            net = BagNetRegressor(ndim=ndim, p=dropout, pool=pool, init_cuda=True)
         elif method == "InstanceNetClassifier":
             raise NotImplementedError("InstanceNetClassifier not supported")
         elif method == "BagNetClassifier":
@@ -395,14 +399,14 @@ def train_and_predict(config, x_train_val, x_test, y_train_val, idx_train_val):
     elif method in ["AttentionNetRegressor", "AttentionNetClassifier"]:
         from miqsar.estimators.utils import set_seed
         set_seed(random_seed)
-        hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, instance_dropout =  _get_params_attention(config)
+        hidden_layer_units, det_ndim, n_epoch, lr, weight_decay, batch_size, instance_dropout, dropout =  _get_params_attention(config)
         input_unit = x_train_val_scaled[0].shape[1]
         hidden_layer_units.insert(0, input_unit)
         ndim = tuple(hidden_layer_units)
 
         from miqsar.estimators.attention_nets import AttentionNetRegressor, AttentionNetClassifier
         if method == "AttentionNetRegressor":
-            net = AttentionNetRegressor(ndim=ndim, det_ndim=det_ndim, init_cuda=True)
+            net = AttentionNetRegressor(ndim=ndim, det_ndim=det_ndim, p=dropout, init_cuda=True)
         elif method == "AttentionNetClassifier":
             raise NotImplementedError("AttentionNetClassifier not supported")
 
@@ -483,13 +487,13 @@ def report_result(ml_method, label, idx_test, y_test, y_test_pred, idx_train_val
         fig = plt.figure(figsize=[6,6])
         plt.scatter(y_test, y_test_pred, c='k', marker='o', s=10)
         xmin = min(y_test.min(), y_test_pred.min()) - 1.0
-        xmax = min(y_test.max(), y_test_pred.max()) + 1.0
+        xmax = max(y_test.max(), y_test_pred.max()) + 1.0
         plt.plot([xmin, xmax], [xmin, xmax], 'k-', linewidth=1)
-        #x = np.linspace(xmin, xmax, num=5)
-        #plt.fill_between(x, x-1, x+1, alpha=0.2)
+        x = np.linspace(xmin, xmax, num=5)
+        plt.fill_between(x, x-1, x+1, alpha=0.2)
         plt.axis([xmin, xmax, xmin, xmax])
 
-        title = f"{label}\n{ml_method.strip('Regressor')}"
+        title = f"{label}\n{ml_method}"
         plt.title(title)
 
         statistics_text = f"N = {len(y_test)} compounds\n"

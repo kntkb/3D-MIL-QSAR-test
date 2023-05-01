@@ -33,7 +33,8 @@ def gen_confs_obabel(rdkit_mol, nconf=50):
     mol = pybel.readstring('mol', Chem.MolToMolBlock(rdkit_mol)).OBMol  # convert mol from RDKit to OB
     mol.AddHydrogens()
 
-    pff = ob.OBForceField_FindType('mmff94')
+    #pff = ob.OBForceField_FindType('mmff94')
+    pff = ob.OBForceField.FindType('mmff94')
     if not pff.Setup(mol):  # if OB FF setup fails use RDKit conformer generation (slower)
         print('err')
 
@@ -150,6 +151,7 @@ def gen_confs(mol, mol_name, nconf, energy, rms, seed, act, mol_id):
 
 def main_params(in_fname, out_fname, id_field_name, nconf, energy, rms, ncpu, seed, verbose, log=False):
     start_time = time.time()
+    logging.debug(f' rms: {rms}, energy: {energy}, ncpu: {ncpu}, nconf: {nconf}')
 
     output_file_type = None
     if out_fname is not None:
@@ -167,6 +169,8 @@ def main_params(in_fname, out_fname, id_field_name, nconf, energy, rms, ncpu, se
         elif out_fname.lower().endswith('.pkl'):
             writer = open(out_fname, 'wb')
             output_file_type = 'pkl'
+            #sdf_writer = Chem.SDWriter(out_fname)
+            #sdf_output_file_type = 'sdf'
         else:
             raise Exception("Wrong output file format. Can be only SDF, SDF.GZ or PKL.")
 
@@ -187,9 +191,14 @@ def main_params(in_fname, out_fname, id_field_name, nconf, energy, rms, ncpu, se
             if output_file_type == 'pkl':
                 mol_conf_list = []
 
+                #mol.SetProp("_Name", mol_name)
+                #mol.SetProp("Act", str(act))
+                #mol.SetProp("Mol", mol_id)
                 for confId, energ in ids_sorted:
                     #logging.debug(f" Generate 3D conformations for {mol_id}")
                     name = '{name}_{confId}'.format(name=mol_name, confId=confId)
+                    #sdf_writer.write(mol, confId=confId)
+                    
                     mol_conf = Chem.Mol(mol, False, confId)
                     if not log:
                         pickle.dump((mol_conf, name, act, mol_id), writer, -1)
@@ -198,7 +207,6 @@ def main_params(in_fname, out_fname, id_field_name, nconf, energy, rms, ncpu, se
 
                 if log and mol_conf_list:
                     pickle.dump(mol_conf_list, writer, -1)
-
             else:
                 mol.SetProp("_Name", mol_name)
                 mol.SetProp("Act", str(act))

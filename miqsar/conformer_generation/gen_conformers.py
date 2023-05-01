@@ -44,7 +44,7 @@ def get_n_confs(conf_log, nconf_list, out_partfname):
     return out_fnames
 
 
-def gen_confs(fname, nconfs_list, stereo=True, energy=50, path=None, ncpu=4):
+def gen_confs(fname, nconfs_list, stereo, energy=50, rms=0.5, ncpu=4, path=None):
     '''
 
     :param fname: smi file. Mol_name, smiles, act
@@ -54,7 +54,7 @@ def gen_confs(fname, nconfs_list, stereo=True, energy=50, path=None, ncpu=4):
     :param ncpu: int
     :return:
     '''
-
+    
     if path is None:
         path = os.path.dirname(fname)
     if not os.path.exists(path):
@@ -85,7 +85,7 @@ def gen_confs(fname, nconfs_list, stereo=True, energy=50, path=None, ncpu=4):
                                id_field_name=None,
                                nconf=max_conf,
                                energy=energy,
-                               rms=.5,
+                               rms=rms,
                                ncpu=ncpu,
                                seed=42,
                                verbose=False,

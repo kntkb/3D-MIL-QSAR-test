@@ -14,9 +14,9 @@ from typing import Sequence, Tuple, Union
 
 class MLP(nn.Module):
     """
-    Multilayer perceptron model with 3 hidden layers (2 hidden + 1 out) and ReLU nonlinearities.
+    Multilayer perceptron model with 4 hidden layers (3 hidden + 1 out) and ReLU nonlinearities.
     """
-    def __init__(self, ndim: Sequence,  init_cuda: bool =False):
+    def __init__(self, ndim: Sequence, p: float=0.0, init_cuda: bool=False):
         """
         Parameters
         -----------
@@ -29,7 +29,7 @@ class MLP(nn.Module):
         """
         super().__init__()
         self.init_cuda = init_cuda
-        self.main_net = MainNet(ndim)
+        self.main_net = MainNet(ndim, p)
         self.estimator = Linear(ndim[-1], 1)
 
         if self.init_cuda:
@@ -80,7 +80,7 @@ class MLP(nn.Module):
 
     def fit(self, x: Union[Sequence[Union[Sequence, np.array]], np.array],
             y: Union[Sequence,np.array], n_epoch: int = 100, batch_size: int = 128,
-            lr: float = 0.001, weight_decay: float = 0, dropout: float = 0, verbose: bool = False) -> 'MLP':
+            lr: float = 0.001, weight_decay: float = 0, verbose: bool = False) -> 'MLP':
         """
         Fit data to model.  NOTE: this method works only with  subclasses (which initialize estimator/loss)
         Parameters
@@ -140,7 +140,7 @@ class MLP(nn.Module):
                 if verbose:
                     print(epoch, loss)
         self.load_state_dict(best_parameters, strict=True)
-        torch.save(best_parameter, "model.th")
+        torch.save(best_parameters, "model.th")
         return self
 
     def predict(self, x):
@@ -155,13 +155,13 @@ class MLP(nn.Module):
 
 class MLPNetClassifier(MLP, BaseClassifier):
 
-    def __init__(self, ndim=None, init_cuda=False):
-        super().__init__(ndim=ndim, init_cuda=init_cuda)
+    def __init__(self, ndim=None, p=0.0, init_cuda=False):
+        super().__init__(ndim=ndim, p=p, init_cuda=init_cuda)
 
 
 class MLPNetRegressor(MLP, BaseRegressor):
-    def __init__(self, ndim=None, init_cuda=False):
-        super().__init__(ndim=ndim, init_cuda=init_cuda)
+    def __init__(self, ndim=None, p=0.0, init_cuda=False):
+        super().__init__(ndim=ndim, p=p, init_cuda=init_cuda)
 
 class BagWrapper:
     """
@@ -224,9 +224,7 @@ class BagWrapper:
         return bags_modified
 
     def fit(self, bags:Union[Sequence[Union[Sequence, np.array]], np.array], labels: Union[Sequence, np.array],
-            n_epoch:int=100, batch_size:int=128,
-            weight_decay:float=0, dropout:float=0,
-            temp:int=1, lr:float=0.001) -> nn.Module:
+            n_epoch:int=100, batch_size:int=128, weight_decay:float=0, temp:int=1, lr:float=0.001) -> nn.Module:
         """
         NOTE: works only with estimators providing loss method
         Examples
@@ -266,7 +264,7 @@ l       Labels: array-like
         """
         bags_modified = self.apply_pool(bags)
         self.estimator.fit(x=bags_modified, y=labels, n_epoch=n_epoch, batch_size=batch_size,
-                           dropout=dropout, weight_decay=weight_decay, lr=lr)
+                           weight_decay=weight_decay, lr=lr)
         return self.estimator
 
     def predict(self, bags: Union[Sequence[Union[Sequence, np.array]], np.array]) -> np.array:
@@ -293,7 +291,7 @@ class InstanceWrapper:
     single value.
     """
 
-    def __init__(self, estimator, pool='mean'):
+    def __init__(self, estimator: nn.Module, pool: str='mean') -> None:
         self.estimator = estimator
         self.pool = pool
 
@@ -309,8 +307,7 @@ class InstanceWrapper:
         return preds
 
     def fit(self, bags: Union[Sequence[Union[Sequence, np.array]], np.array], labels: Union[Sequence, np.array],
-                n_epoch: int = 100, batch_size: int = 128,
-                weight_decay: float = 0, dropout: float = 0,  lr: float = 0.001) -> "InstanceWrapper":
+            n_epoch: int = 100, batch_size: int = 128, weight_decay: float = 0, lr: float = 0.001) -> "InstanceWrapper":
         """
         
         Examples
@@ -351,7 +348,7 @@ class InstanceWrapper:
         bags_modified = np.vstack(bags)
         labels_modified = np.hstack([float(lb) * np.array(np.ones(len(bag))) for bag, lb in zip(bags, labels)])
         self.estimator.fit(bags_modified, labels_modified, n_epoch=n_epoch, batch_size=batch_size,
-                           dropout=dropout, weight_decay=weight_decay, lr=lr)
+                           weight_decay=weight_decay, lr=lr)
         return self.estimator
 
     def predict(self, bags: Union[Sequence[np.array], np.array]) -> np.array:
@@ -381,7 +378,7 @@ class InstanceWrapper:
 
 class BagWrapperMLPRegressor(BagWrapper, BaseRegressor):
 
-    def __init__(self, ndim:Sequence, pool:str='mean', init_cuda:bool=False):
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False):
         """
         Parameters
         ----------
@@ -393,13 +390,13 @@ class BagWrapperMLPRegressor(BagWrapper, BaseRegressor):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        estimator = MLPNetRegressor(ndim=ndim, init_cuda=init_cuda)
+        estimator = MLPNetRegressor(ndim=ndim, p=p, init_cuda=init_cuda)
         super().__init__(estimator=estimator, pool=pool)
 
 
 class BagWrapperMLPClassifier(BagWrapper, BaseClassifier):
 
-    def __init__(self, ndim: Sequence, pool: str = 'mean', init_cuda: bool = False):
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False):
         """
         Parameters
         ----------
@@ -411,13 +408,13 @@ class BagWrapperMLPClassifier(BagWrapper, BaseClassifier):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        estimator = MLPNetClassifier(ndim=ndim, init_cuda=init_cuda)
+        estimator = MLPNetClassifier(ndim=ndim, p=p, init_cuda=init_cuda)
         super().__init__(estimator=estimator, pool=pool)
 
 
 class InstanceWrapperMLPRegressor(InstanceWrapper, BaseRegressor):
 
-    def __init__(self, ndim, pool='mean', init_cuda=False):
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False):
         """
         Parameters
         ----------
@@ -429,13 +426,13 @@ class InstanceWrapperMLPRegressor(InstanceWrapper, BaseRegressor):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        estimator = MLPNetRegressor(ndim=ndim, init_cuda=init_cuda)
+        estimator = MLPNetRegressor(ndim=ndim, p=p, init_cuda=init_cuda)
         super().__init__(estimator=estimator, pool=pool)
 
 
 class InstanceWrapperMLPClassifier(InstanceWrapper, BaseClassifier):
 
-    def __init__(self, ndim, pool='mean', init_cuda=False):
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False):
         """
         Parameters
         ----------
@@ -447,5 +444,5 @@ class InstanceWrapperMLPClassifier(InstanceWrapper, BaseClassifier):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        estimator = MLPNetClassifier(ndim=ndim, init_cuda=init_cuda)
+        estimator = MLPNetClassifier(ndim=ndim, p=p, init_cuda=init_cuda)
         super().__init__(estimator=estimator, pool=pool)

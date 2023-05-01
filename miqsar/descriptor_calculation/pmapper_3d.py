@@ -14,6 +14,11 @@ from pmapper.pharmacophore import Pharmacophore
 from pmapper.customize import load_smarts
 from miqsar.descriptor_calculation.read_input import __read_pkl, __read_sdf
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
+
 __smarts_patterns = load_smarts()
 
 
@@ -219,6 +224,7 @@ def main(inp_fname=None, out_fname=None, atom_exclusion=False, smarts_features=N
     ----------
     #  todo
     """
+    #logging.debug(f' remove: {remove}')
     if colnames is not None:
         cols = []
         with open(colnames, "rt") as tmp:
@@ -307,9 +313,10 @@ def main(inp_fname=None, out_fname=None, atom_exclusion=False, smarts_features=N
     else:
         # determine frequency of descriptors occurrence and select frequently occurring
         threshold = len(tmp_titles) * remove
-        print(threshold)
+        #print(f' threshold: {threshold}')
 
         desc_ids = {k for k, v in c.items() if v >= threshold}
+        #print(f' desc_ids_length: {len(desc_ids)}')
 
         # create output files with removed descriptors
 

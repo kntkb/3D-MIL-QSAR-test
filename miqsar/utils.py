@@ -26,18 +26,18 @@ def read_pkl(fname):
                 break
 
 
-def calc_3d_pmapper(input_fname=None, nconfs_list=[1, 50], energy=10, descr_num=[4], ncpu=5, path='.'):
+def calc_3d_pmapper(input_fname=None, nconfs_list=[1, 50], energy=10, rms=0.5, stereo=False, descr_num=[4], remove=0.05, ncpu=4, path='.'):
     """
     """
     logging.debug(f" Calculate 3D-pmapper")
-    conf_files = gen_confs(input_fname, ncpu=ncpu, nconfs_list=nconfs_list, stereo=False, energy=energy, path=path)
+    conf_files = gen_confs(input_fname, nconfs_list=nconfs_list, stereo=stereo, energy=energy, rms=rms, ncpu=ncpu, path=path)
     
     #smarts_features = load_smarts('./miqsar/smarts_features.txt')
     #factory = load_factory('./miqsar/smarts_features.fdef')    
     import miqsar as miqsar
     basepath = os.path.dirname(miqsar.__file__)
     smarts_features = load_smarts(os.path.join(basepath, 'smarts_features.txt'))
-    factory = load_factory(os.path.join(basepath, 'smarts_features.fdef'))
+    #factory = load_factory(os.path.join(basepath, 'smarts_features.fdef'))
 
     for conf_file in conf_files:
     
@@ -48,7 +48,7 @@ def calc_3d_pmapper(input_fname=None, nconfs_list=[1, 50], energy=10, descr_num=
         #                         descr_num=descr_num, remove=0.05, keep_temp=False, ncpu=ncpu, verbose=False)
         calc_pmapper_descriptors(inp_fname=conf_file, out_fname=out_fname, 
                                  smarts_features=smarts_features,
-                                 descr_num=descr_num, remove=0.05, keep_temp=False, ncpu=ncpu, verbose=False)
+                                 descr_num=descr_num, remove=remove, keep_temp=False, ncpu=ncpu, verbose=False)
 
 
         #

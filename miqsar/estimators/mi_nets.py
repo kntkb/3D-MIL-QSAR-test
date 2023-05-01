@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch.nn import Sequential, Linear, ReLU, Softmax, Sigmoid
+from torch.nn import Sequential, Linear, ReLU, Softmax, Sigmoid, Dropout
 from .base_nets import BaseNet, BaseRegressor, BaseClassifier
 from typing import Sequence, Tuple
 
@@ -17,7 +17,7 @@ class MainNet:
     THe same net can be used for single instance learning, in which case it essentially is MLP.
     """
 
-    def __new__(cls, ndim: Sequence):
+    def __new__(cls, ndim: Sequence, p: float):
         """
         Parameters
         -----------
@@ -29,12 +29,25 @@ class MainNet:
         MainNet instance
         """
         ind, hd1, hd2, hd3 = ndim
-        net = Sequential(Linear(ind, hd1),
-                         ReLU(),
-                         Linear(hd1, hd2),
-                         ReLU(),
-                         Linear(hd2, hd3),
-                         ReLU())
+        if p == 0:
+          print("No dropouts")
+          net = Sequential(Linear(ind, hd1),
+                          ReLU(),
+                          Linear(hd1, hd2),
+                          ReLU(),
+                          Linear(hd2, hd3),
+                          ReLU())
+        else:
+          print(f"Dropout={p}")
+          net = Sequential(Linear(ind, hd1),
+                          Dropout(p=p),
+                          ReLU(),
+                          Linear(hd1, hd2),
+                          Dropout(p=p),
+                          ReLU(),
+                          Linear(hd2, hd3),
+                          Dropout(p=p),
+                          ReLU())
 
         return net
 
@@ -108,7 +121,7 @@ class BagNet(BaseNet):
      aggregates for each molecule  all conformers into a single vector (by method defined in pool parameter), representing whole bag.
 
     """
-    def __init__(self, ndim:Sequence, pool:str='mean', init_cuda:bool=False) -> None:
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False) -> None:
         """
         Parameters
         ----------
@@ -122,7 +135,7 @@ class BagNet(BaseNet):
 
         """
         super().__init__(init_cuda=init_cuda)
-        self.main_net = MainNet(ndim)
+        self.main_net = MainNet(ndim, p)
         self.pooling = Pooling(pool)
         self.estimator = Linear(ndim[-1], 1)
 
@@ -175,7 +188,7 @@ class InstanceNet(BaseNet):
 
     """
 
-    def __init__(self, ndim:Sequence, pool:str='mean', init_cuda:bool=False) -> None:
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False) -> None:
         """
         Parameters
         ----------
@@ -189,7 +202,7 @@ class InstanceNet(BaseNet):
         """
 
         super().__init__(init_cuda=init_cuda)
-        self.main_net = Sequential(MainNet(ndim), Linear(ndim[-1], 1))
+        self.main_net = Sequential(MainNet(ndim, p), Linear(ndim[-1], 1))
         self.pooling = Pooling(pool)
 
         if self.init_cuda:
@@ -254,7 +267,7 @@ class BagNetClassifier(BagNet, BaseClassifier):
       (estimator): Linear(in_features=4, out_features=1, bias=True)
     )
     """
-    def __init__(self, ndim: Sequence, pool:str='mean', init_cuda:bool=False) -> None:
+    def __init__(self, ndim: Sequence, p: float=0.0, pool:str='mean', init_cuda:bool=False) -> None:
         """
         Parameters
         -----------
@@ -267,7 +280,7 @@ class BagNetClassifier(BagNet, BaseClassifier):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        super().__init__(ndim=ndim, pool=pool, init_cuda=init_cuda)
+        super().__init__(ndim=ndim, p=p, pool=pool, init_cuda=init_cuda)
 
 
 class BagNetRegressor(BagNet, BaseRegressor):
@@ -294,7 +307,7 @@ class BagNetRegressor(BagNet, BaseRegressor):
       (estimator): Linear(in_features=4, out_features=1, bias=True)
     )
     """
-    def __init__(self, ndim:Sequence, pool:str='mean', init_cuda:bool=False) -> None:
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False) -> None:
         """
         Parameters
         -----------
@@ -306,7 +319,7 @@ class BagNetRegressor(BagNet, BaseRegressor):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        super().__init__(ndim=ndim, pool=pool, init_cuda=init_cuda)
+        super().__init__(ndim=ndim, p=p, pool=pool, init_cuda=init_cuda)
 
 
 class InstanceNetClassifier(InstanceNet, BaseClassifier):
@@ -335,7 +348,7 @@ class InstanceNetClassifier(InstanceNet, BaseClassifier):
       (pooling): Pooling(Pooling(out_dim=1))
     )
     """
-    def __init__(self, ndim:Sequence, pool:str='mean', init_cuda:bool=False) -> None:
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False) -> None:
         """
         Parameters
         -----------
@@ -347,7 +360,7 @@ class InstanceNetClassifier(InstanceNet, BaseClassifier):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        super().__init__(ndim=ndim, pool=pool, init_cuda=init_cuda)
+        super().__init__(ndim=ndim, p=p, pool=pool, init_cuda=init_cuda)
 
 
 class InstanceNetRegressor(InstanceNet, BaseRegressor):
@@ -375,7 +388,7 @@ class InstanceNetRegressor(InstanceNet, BaseRegressor):
       (pooling): Pooling(Pooling(out_dim=1))
     )
     """
-    def __init__(self, ndim:Sequence, pool:str='mean', init_cuda:bool=False) -> None:
+    def __init__(self, ndim: Sequence, p: float=0.0, pool: str='mean', init_cuda: bool=False) -> None:
         """
         Parameters
         -----------
@@ -387,4 +400,4 @@ class InstanceNetRegressor(InstanceNet, BaseRegressor):
         init_cuda: bool, default is False
         Use Cuda GPU or not?
         """
-        super().__init__(ndim=ndim, pool=pool, init_cuda=init_cuda)
+        super().__init__(ndim=ndim, p=p, pool=pool, init_cuda=init_cuda)

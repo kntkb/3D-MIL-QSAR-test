@@ -35,7 +35,7 @@ class AttentionNet(BaseNet):
         using attention weights, which are also learnt here. 
 
        """
-    def __init__(self, ndim: Sequence, det_ndim: Sequence, init_cuda: bool = False):
+    def __init__(self, ndim: Sequence, det_ndim: Sequence, p: float=0.0, init_cuda: bool=False):
         """
               Parameters
               ----------
@@ -50,13 +50,15 @@ class AttentionNet(BaseNet):
 
               """
         super().__init__(init_cuda=init_cuda)
-        self.main_net = MainNet(ndim)
+        self.main_net = MainNet(ndim, p)
         self.estimator = Linear(ndim[-1], 1)
         #
         input_dim = ndim[-1]
         attention = []
         for dim in det_ndim:
             attention.append(Linear(input_dim, dim))
+            #if p != 0:
+            #  attention.append(Dropout(p))
             attention.append(Sigmoid())
             input_dim = dim
         attention.append(Linear(input_dim, 1))
@@ -137,7 +139,7 @@ class AttentionNetClassifier(AttentionNet, BaseClassifier):
       )
     )
       """
-    def __init__(self, ndim: Sequence, det_ndim: Sequence, init_cuda: bool=False):
+    def __init__(self, ndim: Sequence, det_ndim: Sequence, p: float=0.0, init_cuda: bool=False):
             """
             Parameters
             -----------
@@ -149,7 +151,7 @@ class AttentionNetClassifier(AttentionNet, BaseClassifier):
             init_cuda: bool, default is False
             Use Cuda GPU or not?
             """
-            super().__init__(ndim=ndim, det_ndim=det_ndim, init_cuda=init_cuda)
+            super().__init__(ndim=ndim, det_ndim=det_ndim, p=p, init_cuda=init_cuda)
 
 
 class AttentionNetRegressor(AttentionNet, BaseRegressor):
@@ -181,7 +183,7 @@ class AttentionNetRegressor(AttentionNet, BaseRegressor):
       )
     )
       """
-    def __init__(self, ndim: Sequence, det_ndim: Sequence, init_cuda=False):
+    def __init__(self, ndim: Sequence, det_ndim: Sequence, p: float=0.0, init_cuda=False):
             """
             Parameters
             -----------
@@ -192,4 +194,4 @@ class AttentionNetRegressor(AttentionNet, BaseRegressor):
             init_cuda: bool, default is False
             Use Cuda GPU or not?
             """
-            super().__init__(ndim=ndim, det_ndim=det_ndim, init_cuda=init_cuda)
+            super().__init__(ndim=ndim, det_ndim=det_ndim, p=p, init_cuda=init_cuda)
