@@ -1,0 +1,26 @@
+option:
+  path_to_dataset: /home/takabak/data/3dmil-test/datasets-custom/gpcrdb
+  dataset: @@@DATASET@@@
+  random_seed: 43
+  train_val_test_ratio: [0.7, 0.1, 0.2]   # train/val merged and split into 80:20
+
+
+# Descriptor method supports [pmapper, rdkit_morgan, rdkit_2d]
+descriptor: 
+  method: pmapper        # Options are [ pmapper, rdkit_morgan, rdkit_2d ]. If rdkit descriptor is chosen, all other options will be ignored
+  energy_threshold: 20   # Conformers with energy difference from the lowest found one higher than the specifie. Default is 10 kcal/mol 
+  n_conformation: 30     # Number of generated conformers. Default is 5.
+  rms_threshold: 1.5     # Only conformers with RMSD higher then threshold will be kept. Default is 0.5 angstroms.
+
+
+# ML model wrapper
+ml_model:
+  method: AttentionNetRegressor
+  hidden_layer_units:  [256, 128, 64]
+  attention_hidden_layer_units: [4, 4]
+  instance_dropout: 0.95
+  n_epoch: 200
+  lr: 0.001
+  weight_decay: 0.0
+  batch_size: 64
+  dropout: 0.0

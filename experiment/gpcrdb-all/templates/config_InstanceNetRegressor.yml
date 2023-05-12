@@ -1,0 +1,23 @@
+option:
+  path_to_dataset: /home/takabak/data/3dmil-test/datasets-custom/gpcrdb
+  dataset: @@@DATASET@@@
+  random_seed: 43
+  train_val_test_ratio: [0.7, 0.1, 0.2]   # train/val merged and split into 80:20
+
+
+# Descriptor method supports [pmapper, rdkit_morgan, rdkit_2d]
+descriptor: 
+  path: ../AttentionNetRegressor/descriptor  # Reuse files from path and skip conformational sampling and descriptor calculation
+  method: pmapper        # Options are [ pmapper, rdkit_morgan, rdkit_2d ]. If rdkit descriptor is chosen, all other options will be ignored
+
+
+# ML model wrapper
+ml_model:
+  method: InstanceNetRegressor
+  hidden_layer_units:  [256, 128, 64]
+  pool: mean   # [mean, max, lse]
+  n_epoch: 200
+  lr: 0.001
+  weight_decay: 0.0
+  batch_size: 64
+  dropout: 0.0
