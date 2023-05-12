@@ -18,7 +18,7 @@ ml_model:
   method: AttentionNetRegressor
   hidden_layer_units:  [256, 128, 64]
   attention_hidden_layer_units: [4, 4]
-  n_epoch: 10
+  n_epoch: 100
   lr: 0.001
   weight_decay: 0.0
   batch_size: 128
