@@ -1,0 +1,5 @@
+Mean signed error          -0.0228
+Root mean squared error     0.1168
+Mean unsigned error         0.0739
+Kendall tau                 0.9559
+Pearson R                   0.9956
